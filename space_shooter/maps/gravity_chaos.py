@@ -8,7 +8,7 @@ import math
 import random
 from .base_map import BaseMap
 from entities.obstacle import Asteroid, BlackHole
-from settings import SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, RED
+from settings import SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, RED, ASSET_BACKGROUND_MAP2
 
 class GravityChaosMap(BaseMap):
     """
@@ -19,22 +19,24 @@ class GravityChaosMap(BaseMap):
     """
     
     def __init__(self):
-        super().__init__("Gravity Chaos Zone", 'resources/background.png')
+        super().__init__("Gravity Chaos Zone", ASSET_BACKGROUND_MAP2)
         
-        # Black hole at center
-        self.black_hole = BlackHole(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, 50)
+        # Multiple moderate-sized black holes (not too big)
+        self.black_holes = [
+            BlackHole(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, 35),  # Center - medium
+            BlackHole(SCREEN_WIDTH // 4, SCREEN_HEIGHT // 3, 30),   # Top left - smaller
+            BlackHole(SCREEN_WIDTH * 3 // 4, SCREEN_HEIGHT * 2 // 3, 30),  # Bottom right - smaller
+        ]
         
-        # Create orbiting asteroids
+        # Create asteroids scattered around the map
         self.asteroids = []
-        for i in range(8):
-            angle = random.uniform(0, 2 * math.pi)
-            dist = random.randint(150, 280)
+        for i in range(12):
             self.asteroids.append(Asteroid(
-                x=self.black_hole.x + math.cos(angle) * dist,
-                y=self.black_hole.y + math.sin(angle) * dist,
+                x=random.randint(50, SCREEN_WIDTH - 50),
+                y=random.randint(50, SCREEN_HEIGHT - 50),
                 vx=random.uniform(-0.8, 0.8),
                 vy=random.uniform(-0.8, 0.8),
-                radius=random.randint(18, 28)
+                radius=random.randint(16, 24)
             ))
         
         # Warning timer
@@ -42,32 +44,36 @@ class GravityChaosMap(BaseMap):
         self.warning_timer = 0
     
     def update(self):
-        """Update black hole and asteroids"""
+        """Update black holes and asteroids"""
         super().update()
         
-        # Update black hole animation
-        self.black_hole.update()
+        # Update all black holes animation
+        for bh in self.black_holes:
+            bh.update()
         
-        # Update asteroids with slight gravity
+        # Update asteroids with slight gravity from nearest black hole
         for asteroid in self.asteroids:
-            asteroid.update(self.black_hole.x, self.black_hole.y, gravity=0.02)
+            # Find nearest black hole
+            nearest_bh = min(self.black_holes, 
+                           key=lambda bh: math.hypot(bh.x - asteroid.x, bh.y - asteroid.y))
+            asteroid.update(nearest_bh.x, nearest_bh.y, gravity=0.02)
     
     def draw(self, display, font=None):
-        """Draw map with black hole and asteroids"""
+        """Draw map with black holes and asteroids"""
         super().draw(display)
         
-        # Draw black hole
-        self.black_hole.draw(display)
-        
-        # Draw warning zone around black hole
-        warning_radius = 120
-        pygame.draw.circle(display, (255, 50, 50, 50), 
-                         (int(self.black_hole.x), int(self.black_hole.y)), 
-                         warning_radius, 2)
+        # Draw all black holes
+        for bh in self.black_holes:
+            bh.draw(display)
+            # Draw warning zone around each black hole
+            warning_radius = 80
+            pygame.draw.circle(display, (255, 50, 50), 
+                             (int(bh.x), int(bh.y)), 
+                             warning_radius, 2)
         
         # Draw danger text
         if font:
-            warning = font.render("! DANGER ZONE !", True, RED)
+            warning = font.render("! GRAVITY CHAOS !", True, RED)
             display.blit(warning, (SCREEN_WIDTH//2 - warning.get_width()//2, 80))
         
         # Draw asteroids
@@ -75,12 +81,11 @@ class GravityChaosMap(BaseMap):
             asteroid.draw(display)
     
     def apply_physics(self, ship):
-        """Apply black hole gravity to ship"""
-        being_consumed = self.black_hole.apply_gravity(ship)
-        
-        # If too close to black hole center, ship dies
-        if being_consumed:
-            return True  # Ship should die
+        """Apply gravity from all black holes to ship"""
+        for bh in self.black_holes:
+            being_consumed = bh.apply_gravity(ship)
+            if being_consumed:
+                return True  # Ship should die
         return False
     
     def check_collision(self, ship):

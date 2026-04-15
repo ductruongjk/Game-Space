@@ -39,6 +39,7 @@ class ModeSelect:
     def show(self):
         """Display mode selection"""
         clock = pygame.time.Clock()
+        pygame.key.set_repeat(0)  # Disable key repeat
         
         while True:
             self.virtual_surf.fill(BLACK)
@@ -104,17 +105,15 @@ class ModeSelect:
                 if event.type == QUIT:
                     pygame.quit()
                     sys.exit()
+                elif event.type == VIDEORESIZE:
+                    self.window = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                 
                 if event.type == KEYDOWN:
-                    if event.key == K_p:
-                        return GAME_MODE_PVP
-                    elif event.key == K_e:
-                        return GAME_MODE_PVE
-                    elif event.key == K_LEFT:
-                        self.selected = 0
-                    elif event.key == K_RIGHT:
-                        self.selected = 1
-                    elif event.key == K_RETURN:
+                    if event.key == K_LEFT or event.key == K_a:
+                        self.selected = max(0, self.selected - 1)
+                    elif event.key == K_RIGHT or event.key == K_d:
+                        self.selected = min(len(self.modes) - 1, self.selected + 1)
+                    elif event.key == K_RETURN or event.key == K_SPACE:
                         return self.modes[self.selected]["mode"]
                     elif event.key == K_ESCAPE or event.key == K_BACKSPACE:
                         return None

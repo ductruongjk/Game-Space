@@ -17,22 +17,23 @@ class MainMenu:
         self.font_small = pygame.font.Font(FONT_MAIN, 14)
         
         self.options = [
-            ("2 Players (PvP)", GAME_MODE_PVP),
-            ("vs AI Bot (PvE)", GAME_MODE_PVE),
-            ("Quit", None)
+            ("[P] Player vs Player", "PVP"),
+            ("[E] Player vs Environment", "PVE"),
+            ("Quit Game", None)
         ]
         self.selected = 0
     
     def show(self):
         """Display menu and return selected mode"""
         clock = pygame.time.Clock()
+        pygame.key.set_repeat(0)  # Disable key repeat for menu
         
         while True:
             self.virtual_surf.fill(BLACK)
             
             # Draw title with glow effect
-            title = self.font_large.render("SPACE SHOOTER", True, CYAN)
-            title_glow = self.font_large.render("SPACE SHOOTER", True, (0, 100, 150))
+            title = self.font_large.render("SPACE FIGHTERS", True, CYAN)
+            title_glow = self.font_large.render("SPACE FIGHTERS", True, (0, 100, 150))
             
             title_x = SCREEN_WIDTH // 2 - title.get_width() // 2
             title_y = 100
@@ -43,8 +44,8 @@ class MainMenu:
             self.virtual_surf.blit(title, (title_x, title_y))
             
             # Draw subtitle
-            subtitle = self.font_small.render("Select Game Mode", True, (200, 200, 200))
-            self.virtual_surf.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, 170))
+            subtitle = self.font_medium.render("Which mode would you like to play?", True, WHITE)
+            self.virtual_surf.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, 180))
             
             # Draw options
             for i, (text, mode) in enumerate(self.options):
@@ -66,7 +67,7 @@ class MainMenu:
                                      (SCREEN_WIDTH//2 - option_text.get_width()//2, y_pos))
             
             # Controls hint
-            hint = self.font_small.render("UP/DOWN: Navigate  |  ENTER: Select", True, (100, 100, 100))
+            hint = self.font_small.render("[P] PvP  |  [E] PvE  |  UP/DOWN: Navigate  |  ENTER: Select  |  ESC: Quit", True, (100, 100, 100))
             self.virtual_surf.blit(hint, (SCREEN_WIDTH//2 - hint.get_width()//2, SCREEN_HEIGHT - 60))
             
             # Scale and display
@@ -77,13 +78,19 @@ class MainMenu:
                 if event.type == QUIT:
                     pygame.quit()
                     sys.exit()
+                elif event.type == VIDEORESIZE:
+                    self.window = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                 
                 if event.type == KEYDOWN:
                     if event.key == K_UP:
                         self.selected = (self.selected - 1) % len(self.options)
                     elif event.key == K_DOWN:
                         self.selected = (self.selected + 1) % len(self.options)
-                    elif event.key == K_RETURN:
+                    elif event.key == K_p:
+                        return "PVP"
+                    elif event.key == K_e:
+                        return "PVE"
+                    elif event.key in (K_RETURN, K_KP_ENTER):
                         mode = self.options[self.selected][1]
                         if mode is None:  # Quit
                             return None
@@ -92,7 +99,7 @@ class MainMenu:
                         return None
             
             clock.tick(FPS)
-    
+        
     def _update_display(self):
         """Scale virtual surface to window"""
         window_size = self.window.get_size()

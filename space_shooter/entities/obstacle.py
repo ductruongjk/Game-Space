@@ -4,7 +4,8 @@ Obstacles - Asteroids and Black Holes
 import pygame
 import math
 import random
-from settings import SCREEN_WIDTH, SCREEN_HEIGHT
+import os
+from settings import SCREEN_WIDTH, SCREEN_HEIGHT, ASSET_BLACKHOLE, ASSET_ASTEROIDS_FOLDER
 
 class Point:
     def __init__(self, x, y):
@@ -16,19 +17,44 @@ def distance(A, B):
 
 
 class Asteroid:
-    """Floating asteroid obstacle"""
+    """Floating asteroid obstacle with image"""
+    
+    # Load asteroid images from the asteroids folder recursively
+    asteroid_images = []
+    try:
+        if os.path.exists(ASSET_ASTEROIDS_FOLDER):
+            for root, _, files in os.walk(ASSET_ASTEROIDS_FOLDER):
+                for f in files:
+                    if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+                        try:
+                            img = pygame.image.load(os.path.join(root, f))
+                            asteroid_images.append(img)
+                        except Exception:
+                            pass
+    except Exception as e:
+        print(f"Warning: Could not load asteroid images: {e}")
     
     def __init__(self, x=None, y=None, vx=None, vy=None, radius=None):
         self.x = x or random.randint(50, SCREEN_WIDTH - 50)
         self.y = y or random.randint(50, SCREEN_HEIGHT - 50)
         self.vx = vx or random.uniform(-1, 1)
         self.vy = vy or random.uniform(-1, 1)
-        self.radius = radius or random.randint(15, 25)
+        self.radius = radius or random.randint(15, 22)
         self.angle = random.uniform(0, 360)
         self.rotation_speed = random.uniform(-2, 2)
         
-        # Asteroid appearance
-        self.color_base = (139, 125, 107)  # Brown-gray
+        # Select random asteroid image
+        self.image = None
+        self.mask = None
+        if Asteroid.asteroid_images:
+            orig_img = random.choice(Asteroid.asteroid_images)
+            # Scale to radius
+            size = self.radius * 2
+            self.image = pygame.transform.scale(orig_img, (size, size))
+            self.mask = pygame.mask.from_surface(self.image)
+        
+        # Fallback colors if no image
+        self.color_base = (139, 125, 107)
         self.color_dark = (100, 90, 80)
         self.color_crater = (80, 70, 60)
     
@@ -59,19 +85,23 @@ class Asteroid:
             self.y = SCREEN_HEIGHT
     
     def draw(self, display):
-        """Draw asteroid"""
+        """Draw asteroid using image or fallback circle"""
         x, y = int(self.x), int(self.y)
-        r = self.radius
         
-        # Main body
-        pygame.draw.circle(display, self.color_base, (x, y), r)
-        pygame.draw.circle(display, self.color_dark, (x, y), r - 3)
-        
-        # Crater details
-        pygame.draw.circle(display, self.color_crater, 
-                         (x - r//3, y - r//3), r//4)
-        pygame.draw.circle(display, self.color_crater, 
-                         (x + r//4, y + r//4), r//5)
+        if self.image:
+            # Rotate image
+            rotated = pygame.transform.rotate(self.image, -self.angle)
+            rect = rotated.get_rect(center=(x, y))
+            display.blit(rotated, rect)
+        else:
+            # Fallback: draw circle
+            r = self.radius
+            pygame.draw.circle(display, self.color_base, (x, y), r)
+            pygame.draw.circle(display, self.color_dark, (x, y), r - 3)
+            pygame.draw.circle(display, self.color_crater, 
+                             (x - r//3, y - r//3), r//4)
+            pygame.draw.circle(display, self.color_crater, 
+                             (x + r//4, y + r//4), r//5)
     
     def check_collision(self, ship_x, ship_y, ship_radius=15):
         """Check collision with ship"""
@@ -85,20 +115,32 @@ class Asteroid:
 
 
 class BlackHole:
-    """Black hole that pulls ships in with gravity"""
+    """Black hole that pulls ships in with gravity - uses blackhole.png"""
     
-    def __init__(self, x=None, y=None, radius=50):
+    def __init__(self, x=None, y=None, radius=35):
         self.x = x or SCREEN_WIDTH // 2
         self.y = y or SCREEN_HEIGHT // 2
-        self.radius = radius
+        self.radius = radius  # Moderate size (35-40 instead of 50)
         self.frame_count = 0
         self.gravity_strength = 0.3
         self.direction = 1  # 1 = pull, -1 = push
         
-        # Visual properties
-        self.glow_color = (100, 0, 150)  # Purple
-        self.core_color = (0, 0, 0)  # Black
-        self.ring_color = (150, 50, 200)  # Purple-pink
+        # Load blackhole image
+        self.image = None
+        self.mask = None
+        try:
+            self.image = pygame.image.load(ASSET_BLACKHOLE)
+            # Scale to radius
+            size = self.radius * 2
+            self.image = pygame.transform.scale(self.image, (size, size))
+            self.mask = pygame.mask.from_surface(self.image)
+        except:
+            pass
+        
+        # Fallback colors if no image
+        self.glow_color = (100, 0, 150)
+        self.core_color = (0, 0, 0)
+        self.ring_color = (150, 50, 200)
     
     def update(self):
         """Update animation"""
@@ -128,33 +170,41 @@ class BlackHole:
         return dist < self.radius + 20  # Return True if ship is being consumed
     
     def draw(self, display):
-        """Draw animated black hole"""
-        rotation = (self.frame_count * 2) % 360
-        
-        # Draw glow rings
-        for i in range(5, 0, -1):
-            radius = self.radius + i * 15
-            alpha_color = (50 + i*20, 0, 100 + i*30)
-            pygame.draw.circle(display, alpha_color, 
-                             (int(self.x), int(self.y)), radius)
-        
-        # Draw center black hole
-        pygame.draw.circle(display, self.core_color, 
-                         (int(self.x), int(self.y)), self.radius)
-        
-        # Draw event horizon ring
-        pygame.draw.circle(display, self.ring_color, 
-                         (int(self.x), int(self.y)), self.radius, 3)
-        
-        # Draw spiral arms
-        for arm in range(4):
-            arm_angle = math.radians(rotation + arm * 90)
-            start_x = self.x + math.cos(arm_angle) * 30
-            start_y = self.y + math.sin(arm_angle) * 30
-            end_x = self.x + math.cos(arm_angle) * 60
-            end_y = self.y + math.sin(arm_angle) * 60
-            pygame.draw.line(display, (150, 50, 200), 
-                           (start_x, start_y), (end_x, end_y), 3)
+        """Draw black hole using image or fallback circles"""
+        if self.image:
+            # Rotate image slowly
+            rotation = (self.frame_count * 2) % 360
+            rotated = pygame.transform.rotate(self.image, rotation)
+            rect = rotated.get_rect(center=(int(self.x), int(self.y)))
+            display.blit(rotated, rect)
+        else:
+            # Fallback: draw animated black hole with circles
+            rotation = (self.frame_count * 2) % 360
+            
+            # Draw glow rings
+            for i in range(5, 0, -1):
+                radius = self.radius + i * 15
+                alpha_color = (50 + i*20, 0, 100 + i*30)
+                pygame.draw.circle(display, alpha_color, 
+                                 (int(self.x), int(self.y)), radius)
+            
+            # Draw center black hole
+            pygame.draw.circle(display, self.core_color, 
+                             (int(self.x), int(self.y)), self.radius)
+            
+            # Draw event horizon ring
+            pygame.draw.circle(display, self.ring_color, 
+                             (int(self.x), int(self.y)), self.radius, 3)
+            
+            # Draw spiral arms
+            for arm in range(4):
+                arm_angle = math.radians(rotation + arm * 90)
+                start_x = self.x + math.cos(arm_angle) * 30
+                start_y = self.y + math.sin(arm_angle) * 30
+                end_x = self.x + math.cos(arm_angle) * 60
+                end_y = self.y + math.sin(arm_angle) * 60
+                pygame.draw.line(display, (150, 50, 200), 
+                               (start_x, start_y), (end_x, end_y), 3)
     
     def draw_direction_indicator(self, display, font):
         """Draw gravity direction indicator (for reverse gravity map)"""

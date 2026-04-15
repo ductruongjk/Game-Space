@@ -32,6 +32,19 @@ class UpgradeScreen:
         self.selected = 0
         self.budget = 1000
         self.spent = 0
+        self.section_count = len(self.categories) + 1
+        self.plasma_preview = None
+        self.cursor_img = None
+        try:
+            self.plasma_preview = pygame.image.load(ASSET_PLASMA_BLAST).convert_alpha()
+            self.plasma_preview = pygame.transform.smoothscale(self.plasma_preview, (64, 64))
+        except:
+            self.plasma_preview = None
+        try:
+            self.cursor_img = pygame.image.load(os.path.join(RESOURCES_DIR, 'cursor.png')).convert_alpha()
+            self.cursor_img = pygame.transform.smoothscale(self.cursor_img, (32, 32))
+        except:
+            self.cursor_img = None
         
         # Colors
         self.player_colors = [CYAN, RED, GREEN, ORANGE] # CYAN for Player 1 as per image
@@ -48,6 +61,7 @@ class UpgradeScreen:
             }
         
         clock = pygame.time.Clock()
+        pygame.key.set_repeat(0)  # Disable key repeat
         
         while True:
             self.virtual_surf.fill(BLACK)
@@ -71,39 +85,88 @@ class UpgradeScreen:
                 y_pos = 180 + i * 40
                 is_selected = i == self.selected
                 
+                # Highlight selected category row
+                if is_selected:
+                    pygame.draw.rect(self.virtual_surf, (20, 80, 120), (90, y_pos - 5, 520, 36), border_radius=8)
+                    # Draw cursor indicator
+                    if self.cursor_img:
+                        self.virtual_surf.blit(self.cursor_img, (55, y_pos - 5))
+
                 # Name
                 name_text = self.font_small.render(f"{cat['name']}:", True, WHITE)
                 self.virtual_surf.blit(name_text, (100, y_pos))
-                
+
                 # Slider bar
                 bar_x = 350
                 bar_w = 200
                 pygame.draw.rect(self.virtual_surf, (60, 60, 60), (bar_x, y_pos + 5, bar_w, 10), border_radius=5)
-                
+
                 # Progress
                 progress = (cat["value"] - cat["min"]) / (cat["max"] - cat["min"])
                 pygame.draw.rect(self.virtual_surf, (0, 200, 255), (bar_x, y_pos + 5, int(bar_w * progress), 10), border_radius=5)
-                
+
                 # X marker
                 self.virtual_surf.blit(self.font_small.render("X", True, WHITE), (bar_x + bar_w + 10, y_pos))
             
-            # Superweapon selection
-            y_super = 320
-            self.virtual_surf.blit(self.font_small.render("Choose your Superweapon:", True, WHITE), (100, y_super))
-            
+            # Superweapon selection row highlight
+            weapon_row_y = 340
+            self.virtual_surf.blit(self.font_small.render("Choose your Superweapon:", True, WHITE), (100, weapon_row_y - 30))
+            if self.selected == len(self.categories):
+                pygame.draw.rect(self.virtual_surf, (20, 80, 120), (90, weapon_row_y - 10, 620, 120), border_radius=8)
+
             # Draw weapons in a row with arrows for the selected one
+            weapon_labels = [
+                "Plasma Blast (Chùm tia plasma)",
+                "Light Speed (Tốc độ ánh sáng)",
+                "Naval Mine (Mìn biển)"
+            ]
             for i, weapon in enumerate(self.superweapons):
-                x_pos = 100 + i * 180
+                x_pos = 100 + i * 220
                 is_sel = i == self.selected_super
                 color = (0, 255, 255) if is_sel else (150, 150, 150)
                 
-                text = self.font_small.render(weapon, True, color)
+                label = weapon_labels[i] if i < len(weapon_labels) else weapon
+                text = self.font_small.render(label, True, color)
                 if is_sel:
-                    self.virtual_surf.blit(self.font_small.render("<", True, WHITE), (x_pos - 15, y_super + 30))
-                    self.virtual_surf.blit(text, (x_pos, y_super + 30))
-                    self.virtual_surf.blit(self.font_small.render(">", True, WHITE), (x_pos + text.get_width() + 5, y_super + 30))
+                    self.virtual_surf.blit(self.font_small.render("<", True, WHITE), (x_pos - 15, weapon_row_y + 20))
+                    self.virtual_surf.blit(text, (x_pos, weapon_row_y + 20))
+                    self.virtual_surf.blit(self.font_small.render(">", True, WHITE), (x_pos + text.get_width() + 5, weapon_row_y + 20))
                 else:
-                    self.virtual_surf.blit(text, (x_pos, y_super + 30))
+                    self.virtual_surf.blit(text, (x_pos, weapon_row_y + 20))
+            
+            # Weapon details and preview
+            selected_label = weapon_labels[self.selected_super]
+            if self.selected_super == 0:
+                details = [
+                    "+ Plasma Blast (Chùm tia plasma)",
+                    "  Hiệu ứng: Bắn ra một viên đạn lớn, xuyên qua mọi vật cản (kể cả thiên thạch), gây sát thương",
+                    "  Thời gian hồi: 5 giây",
+                    "  Sử dụng: Ảnh Muzzle Mega Ion"
+                ]
+            elif self.selected_super == 1:
+                details = [
+                    "+ Light Speed (Tốc độ ánh sáng)",
+                    "  Hiệu ứng: Tăng tốc độ di chuyển",
+                    "  Thời gian hồi: 5 giây"
+                ]
+            else:
+                details = [
+                    "+ Naval Mine (Mìn biển)",
+                    "  Hiệu ứng: 3 mìn bay ngẫu nhiên từ 4 góc (như thiên thạch)",
+                    "  Màu sắc: Cùng màu người chơi đã chọn",
+                    "  Người chơi chọn: Không bị ảnh hưởng, mìn xuyên qua",
+                    "  Đối thủ khác màu: Bị trúng, mất điểm",
+                    "  Sử dụng: navalmine1.webp (Ship1) / navalmine2.jpg (Ship2)"
+                ]
+
+            for idx, line in enumerate(details):
+                color = CYAN if idx == 0 else (200, 200, 200)
+                self.virtual_surf.blit(self.font_small.render(line, True, color), (100, weapon_row_y + 70 + idx * 22))
+
+            if self.plasma_preview and self.selected_super == 0:
+                self.virtual_surf.blit(self.plasma_preview, (620, weapon_row_y + 10))
+                preview_label = self.font_small.render("Preview: Muzzle Mega Ion", True, (180, 180, 180))
+                self.virtual_surf.blit(preview_label, (620, weapon_row_y + 80))
             
             # Buttons
             btn_start = self.font_medium.render("START GAME", True, CYAN)
@@ -117,6 +180,9 @@ class UpgradeScreen:
             pygame.draw.rect(self.virtual_surf, (80, 30, 30), menu_rect.inflate(100, 10), border_radius=5)
             pygame.draw.rect(self.virtual_surf, RED, menu_rect.inflate(100, 10), 2, border_radius=5)
             self.virtual_surf.blit(btn_menu, menu_rect)
+
+            hint_controls = self.font_small.render("Use UP/DOWN to move rows, LEFT/RIGHT to change values or select weapons, ENTER to confirm", True, (180, 180, 180))
+            self.virtual_surf.blit(hint_controls, (100, 560))
             
             self._update_display()
             
@@ -124,25 +190,38 @@ class UpgradeScreen:
             for event in pygame.event.get():
                 if event.type == QUIT:
                     pygame.quit(); sys.exit()
+                elif event.type == VIDEORESIZE:
+                    self.window = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                 if event.type == KEYDOWN:
-                    if event.key == K_UP: self.selected = (self.selected - 1) % len(self.categories)
-                    if event.key == K_DOWN: self.selected = (self.selected + 1) % len(self.categories)
-                    if event.key == K_LEFT and self.selected == 0: self._downgrade_selected()
-                    if event.key == K_RIGHT and self.selected == 0: self._upgrade_selected()
-                    # For rocket and maneuver
-                    if event.key == K_LEFT and self.selected > 0: self._downgrade_selected()
-                    if event.key == K_RIGHT and self.selected > 0: self._upgrade_selected()
-                    
-                    # Superweapon toggle
-                    if event.key == K_1: self.selected_super = 0
-                    if event.key == K_2: self.selected_super = 1
-                    if event.key == K_3: self.selected_super = 2
-                    
-                    if event.key == K_RETURN:
+                    if event.key == K_UP:
+                        self.selected = (self.selected - 1) % self.section_count
+                    elif event.key == K_DOWN:
+                        self.selected = (self.selected + 1) % self.section_count
+                    elif event.key == K_LEFT:
+                        if self.selected < len(self.categories):
+                            self._downgrade_selected()
+                        else:
+                            self.selected_super = (self.selected_super - 1) % len(self.superweapons)
+                    elif event.key == K_RIGHT:
+                        if self.selected < len(self.categories):
+                            self._upgrade_selected()
+                        else:
+                            self.selected_super = (self.selected_super + 1) % len(self.superweapons)
+                    elif event.key == K_1:
+                        self.selected_super = 0
+                        self.selected = len(self.categories)
+                    elif event.key == K_2:
+                        self.selected_super = 1
+                        self.selected = len(self.categories)
+                    elif event.key == K_3:
+                        self.selected_super = 2
+                        self.selected = len(self.categories)
+                    elif event.key == K_RETURN or event.key == K_SPACE:
                         stats = {cat["key"]: cat["value"] for cat in self.categories}
                         stats["super"] = self.superweapons[self.selected_super]
                         return stats
-                    if event.key == K_ESCAPE: return None
+                    elif event.key == K_ESCAPE:
+                        return None
             
             clock.tick(FPS)
     

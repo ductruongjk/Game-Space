@@ -1,7 +1,11 @@
 """
 Settings - Game constants and configuration
 """
+import os
 import pygame
+
+BASE_DIR = os.path.dirname(__file__)
+RESOURCES_DIR = os.path.join(BASE_DIR, 'resources')
 
 # Screen Settings
 SCREEN_WIDTH = 800
@@ -49,25 +53,34 @@ REVERSE_INTERVAL = 14  # seconds
 # Superweapons
 SUPERWEAPON_PLASMA = "Plasma Blast"
 SUPERWEAPON_LIGHTSPEED = "Light Speed"
-SUPERWEAPON_GRAVITY = "Gravity Well"
+SUPERWEAPON_GRAVITY = "Naval Mine"
 
 # Font Paths
-FONT_MAIN = 'resources/font.ttf'
-FONT_SPACE = 'resources/space.ttf'
-FONT_PRESSSTART = 'resources/pressstart.ttf'
+FONT_MAIN = os.path.join(RESOURCES_DIR, 'font.ttf')
+FONT_SPACE = os.path.join(RESOURCES_DIR, 'space.ttf')
+FONT_PRESSSTART = os.path.join(RESOURCES_DIR, 'pressstart.ttf')
 
 # Asset Paths
-ASSET_BACKGROUND = 'resources/background.png'
-ASSET_BACKGROUND_1600 = 'resources/background1600.png'
-ASSET_BACKGROUND_MAP2 = 'resources/background.png'  # Map 2 dùng background mặc định
-ASSET_BACKGROUND_MAP3 = 'resources/backgroundmap3.png'
-ASSET_SHIP1 = 'resources/ship1.png'
-ASSET_SHIP2 = 'resources/ship2.png'
-ASSET_ROCKET1 = 'resources/rocket1.png'
-ASSET_ROCKET2 = 'resources/rocket2.png'
-ASSET_EXPLOSION = 'resources/explosion.png'
-ASSET_BLACKHOLE = 'resources/blackhole.png'
-ASSET_POWERUP = 'resources/lukas_powerup.png'
+ASSET_SHIP1BIG = os.path.join(RESOURCES_DIR, 'ship1big.png')
+ASSET_BACKGROUND = os.path.join(RESOURCES_DIR, 'background.png')
+ASSET_BACKGROUND_1600 = os.path.join(RESOURCES_DIR, 'background1600.png')
+ASSET_BACKGROUND_MAP2 = os.path.join(RESOURCES_DIR, 'backgroundmap2.png')
+ASSET_BACKGROUND_MAP3 = os.path.join(RESOURCES_DIR, 'backgroundmap3.jpg')
+ASSET_SHIP1 = os.path.join(RESOURCES_DIR, 'ship1.png')
+ASSET_SHIP2 = os.path.join(RESOURCES_DIR, 'ship2.png')
+ASSET_ROCKET1 = os.path.join(RESOURCES_DIR, 'rocket1.png')
+ASSET_ROCKET2 = os.path.join(RESOURCES_DIR, 'rocket2.png')
+ASSET_EXPLOSION = os.path.join(RESOURCES_DIR, 'explosion.png')
+ASSET_EXPLOSION_ANIM = os.path.join(RESOURCES_DIR, 'explosion_anim_1200x1200.png')
+ASSET_RESPAWN_ANIM = os.path.join(RESOURCES_DIR, 'respawn_anim_900x900_test.png')
+ASSET_SHIP1_LS = os.path.join(RESOURCES_DIR, 'ship1_lightspeed.png')
+ASSET_SHIP2_LS = os.path.join(RESOURCES_DIR, 'ship2_lightspeed.png')
+ASSET_NAVALMINE1 = os.path.join(RESOURCES_DIR, 'navalmine1.webp')
+ASSET_NAVALMINE2 = os.path.join(RESOURCES_DIR, 'navalmine2.jpg')
+ASSET_PLASMA_BLAST = os.path.join(RESOURCES_DIR, 'Muzzle Mega Ion', 'Muzzle Mega Ion_1.png')
+ASSET_BLACKHOLE = os.path.join(RESOURCES_DIR, 'blackhole.png')
+ASSET_ASTEROIDS_FOLDER = os.path.join(RESOURCES_DIR, 'asteroids')
+ASSET_POWERUP = os.path.join(RESOURCES_DIR, 'lukas_powerup.png')
 
 # Audio Paths
 AUDIO_BG_MUSIC = 'resources/bg_music.mp3'
