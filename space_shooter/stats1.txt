@@ -1,1 +1,1 @@
-{'speed': 2.0, 'maneuver': 3.0, 'rocket': 1.0, 'super': 'Plasma Blast'}
+{'speed': 3.0, 'maneuver': 1.0, 'rocket': 1.0, 'super': 'Light Speed'}
