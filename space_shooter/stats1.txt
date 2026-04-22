@@ -1,0 +1,1 @@
+{'speed': 2.0, 'maneuver': 1.0, 'rocket': 1.5, 'super': 'Naval Mine'}
