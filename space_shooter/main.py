@@ -86,15 +86,15 @@ CYAN_D=(0,150,200); GOLD=(255,215,0)
 # ==================== GAME STATE ====================
 GAME_MODE = "PVP"
 SELECTED_MAP = "Deep Space Arena"
-PLAYER1_NAME = "Player 1"
-PLAYER2_NAME = "Player 2"
+PLAYER1_NAME = ""
+PLAYER2_NAME = ""
 PLAYERS = 2
 
 # Persistent total scores across games
 TOTAL_P1_SCORE = 0
 TOTAL_P2_SCORE = 0
 
-shipspeed = [1, 1]
+shipspeed = [1.5, 1.5]
 maneuv = [1, 1]
 rocketspeed = [1, 1]
 superweapon = [1, 1]  # 1=lightspeed, 2=spacemine
@@ -149,6 +149,8 @@ class Ship:
         # AI
         s.ai_last_shot=0
         s.ai_shoot_cooldown=60
+        # Immortal after respawn
+        s.immortal_until=0
 
     def respawn(s):
         s.alive=False
@@ -162,6 +164,8 @@ class Ship:
             s.alive=True
             s.x=s.resp_x
             s.y=s.resp_y
+            # Set immortal for 5 seconds after respawn
+            s.immortal_until=pygame.time.get_ticks() + 5000
 
     def move(s):
         if s.resp_run and s.player<=PLAYERS:
@@ -183,7 +187,16 @@ class Ship:
             if s.y<0: s.y=SH
             img=pygame.transform.rotate(S1 if s.player==1 else S2, s.direction)
             s.image=img
-            DISPLAY.blit(img,(s.x,s.y))
+            # Check immortal status and add visual effect
+            now=pygame.time.get_ticks()
+            if now < s.immortal_until:
+                # Flashing effect when immortal
+                flash_alpha = 128 + int(127 * math.sin(now * 0.01))
+                img_copy = img.copy()
+                img_copy.set_alpha(flash_alpha)
+                DISPLAY.blit(img_copy,(s.x,s.y))
+            else:
+                DISPLAY.blit(img,(s.x,s.y))
             if s.speed_boost>1.0 and pygame.time.get_ticks()>=s.boost_until:
                 s.speed_boost=1.0
             if s.control_reversed and pygame.time.get_ticks()>=s.boost_until:
@@ -208,9 +221,7 @@ class Ship:
 
     def start_lightspeed(s,other):
         if s.alive:
-            now = pygame.time.get_ticks()
-            s.speed_boost = 2.5
-            s.boost_until = now + 5000
+            s.speed_boost = 3.0
             return [False, False, False]
         return [False, False, False]
 
@@ -272,10 +283,6 @@ class Rocket:
         if s.exists:
             if s.speed<s.maxspeed:
                 s.speed=s.speed*1.01+0.01*rocketspeed[s.player-1]
-            if s.x>SW: s.x=0
-            if s.x<0: s.x=SW
-            if s.y>SH: s.y=0
-            if s.y<0: s.y=SH
         else:
             s.x=s.y=SW+500
             s.speed=0
@@ -283,6 +290,9 @@ class Rocket:
         s.x+=-s.speed*math.sin(rad)
         s.y+=-s.speed*math.cos(rad)
         if s.exists:
+            # Check if rocket is out of screen bounds - if so, mark as non-existent
+            if s.x < -50 or s.x > SW + 50 or s.y < -50 or s.y > SH + 50:
+                s.exists = False
             img=pygame.transform.rotate(R1 if s.player==1 else R2, s.direction)
             DISPLAY.blit(img,(s.x,s.y))
 
@@ -761,13 +771,11 @@ class MapManager:
         elif name == "Gravity Chaos Zone":
             s.background = pygame.image.load(ASSET_BACKGROUND_MAP2).convert()
             s.black_holes = [
-                {'x': SW // 3, 'y': SH // 3, 'radius': 28},
-                {'x': SW * 2 // 3, 'y': SH // 3, 'radius': 28},
-                {'x': SW // 2, 'y': SH * 2 // 3, 'radius': 32},
-                {'x': SW // 4, 'y': SH * 3 // 4, 'radius': 24},
-                {'x': SW * 3 // 4, 'y': SH * 3 // 4, 'radius': 24}
+                {'x': SW // 4, 'y': SH // 4, 'radius': 28},
+                {'x': SW * 3 // 4, 'y': SH // 4, 'radius': 28},
+                {'x': SW // 2, 'y': SH * 3 // 4, 'radius': 32}
             ]
-            s._create_asteroids(14, 18, 26)
+            s._create_asteroids(8, 18, 26)
         elif name == "Reverse Gravity Zone":
             s.background = pygame.image.load(ASSET_BACKGROUND_MAP3).convert()
             s.black_holes = [
@@ -775,7 +783,7 @@ class MapManager:
             ]
             s.reverse_interval = 14 * 60
             s.reverse_timer = s.reverse_interval
-            s._create_asteroids(12, 18, 28)
+            s._create_asteroids(6, 18, 28)
 
     def _load_asteroid_images(s):
         images = []
@@ -818,8 +826,8 @@ class MapManager:
             s.asteroids.append({
                 'x': x,
                 'y': y,
-                'vx': random.uniform(-0.8, 0.8),
-                'vy': random.uniform(-0.8, 0.8),
+                'vx': random.uniform(-0.15, 0.15),
+                'vy': random.uniform(-0.15, 0.15),
                 'radius': radius,
                 'angle': random.uniform(0, 360),
                 'rotation_speed': random.uniform(-2, 2),
@@ -829,6 +837,11 @@ class MapManager:
 
     def apply_gravity(s, ship):
         if s.name == "Deep Space Arena":
+            return False
+
+        # Check if ship is immortal (within 5s of respawn)
+        now = pygame.time.get_ticks()
+        if ship.alive and now < ship.immortal_until:
             return False
 
         ship_pos = pygame.math.Vector2(ship.x, ship.y)
@@ -851,7 +864,15 @@ class MapManager:
             
             force = s.gravity_strength * 10000 / (distance * distance)
             force = min(force, 3)
-            total_force += direction * force * gravity_mode
+            
+            # If ship is using speed boost, add counter force
+            if ship.speed_boost > 1.0:
+                # Add force in opposite direction of gravity
+                counter_force = force * ship.speed_boost / 3.0  # Scale counter force with speed boost
+                total_force += direction * (force - counter_force) * gravity_mode
+            else:
+                total_force += direction * force * gravity_mode
+                
             if distance < hole['radius'] + 20:
                 being_consumed = True
 
@@ -1299,8 +1320,12 @@ def enter_player_names(mode):
     clock = pygame.time.Clock()
     pygame.key.set_repeat(0)
     active = 1
-    name1 = PLAYER1_NAME if PLAYER1_NAME != "Player 1" else ""
-    name2 = PLAYER2_NAME if PLAYER2_NAME != "Player 2" else ""
+    if mode == "PVP":
+        name1 = ""
+        name2 = ""
+    else:
+        name1 = PLAYER1_NAME if PLAYER1_NAME != "Player 1" else ""
+        name2 = "AI BOT"
     if mode == "PVE":
         name2 = "AI BOT"
     while True:
@@ -1479,8 +1504,7 @@ def main():
     ship1=Ship(x*0.8,y*0.8,1)
     ship2=Ship(x*0.2,y*0.8,2)
 
-    rocket1=Rocket(999,999,0,False,1)
-    rocket2=Rocket(999,999,0,False,2)
+    rockets=[]  # List to manage multiple rockets
 
     explosions=[]
     explosion1=Explode(x+500,y+500)
@@ -1520,9 +1544,7 @@ def main():
         ship1.move(); ship2.move()
         ship1.change_angle2(); ship2.change_angle2()
 
-        # Update rockets
-        rocket1.move(); rocket2.move()
-
+        
         # Update plasma beams
         for beam in plasma_beams[:]:
             beam.update()
@@ -1541,7 +1563,9 @@ def main():
 
         # AI Update with Behavior Tree
         if GAME_MODE=="PVE":
-            rocket2,frame_cd2,new_mines=ai_update(ship2,ship1,rocket2,frame_nr,superweapon[1],frame_cd2,plasma_beams,map_mgr)
+            # Get the last rocket for AI (or create dummy if none)
+            ai_rocket = rockets[-1] if rockets and rockets[-1].player == 2 else Rocket(999,999,0,False,2)
+            new_rocket,frame_cd2,new_mines=ai_update(ship2,ship1,ai_rocket,frame_nr,superweapon[1],frame_cd2,plasma_beams,map_mgr)
             if isinstance(new_mines, list):
                 spacemines.extend(new_mines)
 
@@ -1569,6 +1593,14 @@ def main():
 
         # Update explosions
         explosions=[e for e in explosions if e.update()]
+
+        # Update and draw all rockets
+        for rocket in rockets[:]:
+            rocket.move()
+            # Remove rockets that go too far off screen
+            if rocket.x < -200 or rocket.x > SW + 200 or rocket.y < -200 or rocket.y > SH + 200:
+                if rocket in rockets:
+                    rockets.remove(rocket)
 
         # Update powerup
         luk.update(frame_nr)
@@ -1638,59 +1670,74 @@ def main():
         col_y12=ship1.y<ship2.y+30 and ship1.y>ship2.y-30
         col12=col_x12 and col_y12
 
-        # Rocket collisions (original: ±25 box)
-        col_x1r2=ship2.x<rocket1.x+25 and ship2.x>rocket1.x-25
-        col_y1r2=ship2.y<rocket1.y+25 and ship2.y>rocket1.y-25
-        col1r2=col_x1r2 and col_y1r2 and rocket1.exists
-
-        col_x2r1=ship1.x<rocket2.x+25 and ship1.x>rocket2.x-25
-        col_y2r1=ship1.y<rocket2.y+25 and ship1.y>rocket2.y-25
-        col2r1=col_x2r1 and col_y2r1 and rocket2.exists
+        # Rocket collisions - check all rockets in list
+        for rocket in rockets[:]:
+            if rocket.exists:
+                # Check collision with ship1 (if rocket belongs to player 2)
+                if rocket.player == 2:
+                    col_x2r1=ship1.x<rocket.x+25 and ship1.x>rocket.x-25
+                    col_y2r1=ship1.y<rocket.y+25 and ship1.y>rocket.y-25
+                    if col_x2r1 and col_y2r1 and not ship1_immortal:
+                        explosion2=Explode(rocket.x,rocket.y)
+                        if explosionSnd: explosionSnd.play()
+                        rockets.remove(rocket)
+                        ship1=Ship(x*0.8,y*0.8,1)
+                        p1_score-=1; p2_score+=3
+                
+                # Check collision with ship2 (if rocket belongs to player 1)
+                elif rocket.player == 1:
+                    col_x1r2=ship2.x<rocket.x+25 and ship2.x>rocket.x-25
+                    col_y1r2=ship2.y<rocket.y+25 and ship2.y>rocket.y-25
+                    if col_x1r2 and col_y1r2 and not ship2_immortal:
+                        explosion1=Explode(rocket.x,rocket.y)
+                        if explosionSnd: explosionSnd.play()
+                        rockets.remove(rocket)
+                        ship2=Ship(x*0.2,y*0.8,2)
+                        p2_score-=1; p1_score+=3
 
         # Powerup collisions (±30 box)
         col_luk1=ship1.x<luk.x+30 and ship1.x>luk.x-30 and ship1.y<luk.y+30 and ship1.y>luk.y-30
         col_luk2=ship2.x<luk.x+30 and ship2.x>luk.x-30 and ship2.y<luk.y+30 and ship2.y>luk.y-30
 
-        # Asteroid collisions
+        # Asteroid collisions (check immortal status)
         ast_col1=ast_col2=False
         if map_mgr and map_mgr.name in ["Gravity Chaos Zone","Reverse Gravity Zone"]:
+            now=pygame.time.get_ticks()
+            ship1_immortal=ship1.alive and now<ship1.immortal_until
+            ship2_immortal=ship2.alive and now<ship2.immortal_until
             for a in map_mgr.asteroids:
                 dx1=ship1.x-a['x']; dy1=ship1.y-a['y']
                 if math.sqrt(dx1*dx1+dy1*dy1)<a['radius']+20:
                     ast_col1=True; explosion1=Explode(ship1.x,ship1.y)
                     if explosionSnd: explosionSnd.play()
-                    ship1=Ship(x*0.8,y*0.8,1)
-                    p1_score-=1; p2_score+=3
+                    if not ship1_immortal:
+                        ship1=Ship(x*0.8,y*0.8,1)
+                        p1_score-=1; p2_score+=3
                     break
                 dx2=ship2.x-a['x']; dy2=ship2.y-a['y']
                 if math.sqrt(dx2*dx2+dy2*dy2)<a['radius']+20:
                     ast_col2=True; explosion2=Explode(ship2.x,ship2.y)
                     if explosionSnd: explosionSnd.play()
-                    ship2=Ship(x*0.2,y*0.8,2)
-                    p2_score-=1; p1_score+=3
+                    if not ship2_immortal:
+                        ship2=Ship(x*0.2,y*0.8,2)
+                        p2_score-=1; p1_score+=3
                     break
 
-        # Handle collisions (exactly like original)
+        # Handle collisions (check immortal status first)
+        now=pygame.time.get_ticks()
+        ship1_immortal=ship1.alive and now<ship1.immortal_until
+        ship2_immortal=ship2.alive and now<ship2.immortal_until
+        
         if col12:
             explosion1=Explode((ship1.x+ship2.x)/2,(ship1.y+ship2.y)/2)
             if explosionSnd: explosionSnd.play()
-            ship1=Ship(x*0.8,y*0.8,1); ship2=Ship(x*0.2,y*0.8,2)
-            p1_score-=1; p2_score-=1
+            # Only kill ships if not immortal
+            if not ship1_immortal:
+                ship1=Ship(x*0.8,y*0.8,1); p1_score-=1
+            if not ship2_immortal:
+                ship2=Ship(x*0.2,y*0.8,2); p2_score-=1
 
-        elif col2r1:
-            explosion2=Explode(rocket2.x,rocket2.y)
-            if explosionSnd: explosionSnd.play()
-            rocket2=Rocket(999,999,0,False,2)
-            ship1=Ship(x*0.8,y*0.8,1)
-            p1_score-=1; p2_score+=3
-
-        elif col1r2:
-            explosion1=Explode(rocket1.x,rocket1.y)
-            if explosionSnd: explosionSnd.play()
-            rocket1=Rocket(999,999,0,False,1)
-            ship2=Ship(x*0.2,y*0.8,2)
-            p2_score-=1; p1_score+=3
-
+        
         # Powerup effects
         if col_luk1 and luk.alive:
             ship2.lukas=True; luk.alive=False; frame_start=frame_nr
@@ -1720,9 +1767,14 @@ def main():
                         ship1.start_plasma_blast(ship2, plasma_beams)
                         frame_cd1 = frame_nr
                     else:
-                        # Bắn đạn thường
+                        # Ban dan
                         if missileSnd: missileSnd.play()
-                        rocket1=Rocket(ship1.x,ship1.y,ship1.direction,True,1)
+                        rockets.append(Rocket(ship1.x,ship1.y,ship1.direction,True,1))
+
+                if e.key==K_DOWN:
+                    # Tang toc thu cong cho Player 1
+                    if ship1.alive:
+                        ship1.start_lightspeed(ship2)
 
                 # P2 controls (only PvP)
                 if GAME_MODE=="PVP":
@@ -1734,16 +1786,27 @@ def main():
                             ship2.start_plasma_blast(ship1, plasma_beams)
                             frame_cd2 = frame_nr
                         else:
-                            # Bắn đạn thường
+                            # Ban dan
                             if missileSnd: missileSnd.play()
-                            rocket2=Rocket(ship2.x,ship2.y,ship2.direction,True,2)
+                            rockets.append(Rocket(ship2.x,ship2.y,ship2.direction,True,2))
+
+                    if e.key==K_s:
+                        # Tang toc thu cong cho Player 2
+                        if ship2.alive:
+                            ship2.start_lightspeed(ship1)
 
             elif e.type==KEYUP:
                 if e.key==K_RIGHT: ship1.change_angle("RIGHT2",ship1.lukas)
                 if e.key==K_LEFT: ship1.change_angle("LEFT2",ship1.lukas)
+                if e.key==K_DOWN:
+                    # Ngung tang toc Player 1 khi tha phim
+                    ship1.speed_boost = 1.0
                 if GAME_MODE=="PVP":
                     if e.key==K_a: ship2.change_angle("LEFT2",ship2.lukas)
                     if e.key==K_d: ship2.change_angle("RIGHT2",ship2.lukas)
+                    if e.key==K_s:
+                        # ngung tang toc Player 2 khi tha phim
+                        ship2.speed_boost = 1.0
 
         scale_display()
         fpsClock.tick(60)
